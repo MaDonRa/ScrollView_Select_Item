@@ -12,59 +12,60 @@ class ViewController: UIViewController {
 
     @IBOutlet weak var MyScrollView: UIScrollView!
 
-    internal var CurrentIndex : CGFloat = 0
-
+    internal var MyScrollViewSize : CGSize = CGSize(width: ScreenSize.SCREEN_WIDTH, height: 200)
+    internal var CurrentIndex : CGFloat = 1
     internal var SpacePerItem : CGFloat = 15
     internal var ItemPerPage : CGFloat = 3
     internal var TotalItem : CGFloat = 30
     internal var AddBackgroundSizeWhenSelected = CGSize(width: 30, height: 30)
-    internal var BackgroundViewSize : CGSize = CGSize(width: (ScreenSize.SCREEN_WIDTH / 3) - 30, height: 150)
     
-    private var SetCurrentIndexItem : CGFloat {
+    //Private
+    internal var BackgroundViewSize : CGSize {
+        get {
+            return CGSize(width: (MyScrollViewSize.width / 3) - 30, height: MyScrollViewSize.height - 60)
+        }
+    }
+    internal var SetCurrentIndexItem : CGFloat {
         get {
             return CurrentIndex
         }
         set {
-            MyScrollView.setContentOffset(CGPoint(x: ((MyScrollView.frame.size.width/ItemPerPage) * newValue), y: 0), animated: true)
+            CurrentIndex = newValue
+            MyScrollView.setContentOffset(CGPoint(x: ((MyScrollViewSize.width/ItemPerPage) * newValue), y: 0), animated: true)
+            SetupSelectedItem(scrollView : MyScrollView)
         }
     }
-    private var Scrolling : Bool = false
-    private var SelectedBackgroundSize : CGSize {
+    internal var Scrolling : Bool = false
+    internal var SelectedBackgroundSize : CGSize {
         get {
             return CGSize(width: BackgroundViewSize.width + AddBackgroundSizeWhenSelected.width, height: BackgroundViewSize.height + AddBackgroundSizeWhenSelected.height)
         }
     }
-    
+
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        var CounterImage:CGFloat = 1
+        var CounterView:CGFloat = 1
         for Data in 1...Int(TotalItem) {
-            let ImageView = UIView(frame: CGRect(x: ((ScreenSize.SCREEN_WIDTH/ItemPerPage) * CounterImage) + SpacePerItem, y: 100 - (BackgroundViewSize.height/2), width: BackgroundViewSize.width, height: BackgroundViewSize.height))
-         
-            if Data == Int(SetCurrentIndexItem+1) {
-                ImageView.transform = CGAffineTransform(translationX: -(AddBackgroundSizeWhenSelected.width/2), y: -(AddBackgroundSizeWhenSelected.height/2))
-                ImageView.frame.size = SelectedBackgroundSize
-                ImageView.backgroundColor = UIColor.red
-            } else {
-                ImageView.backgroundColor = UIColor.yellow
-            }
+            let BackgroundItem = UIView(frame: CGRect(x: ((MyScrollViewSize.width/ItemPerPage) * CounterView) + SpacePerItem, y: (MyScrollViewSize.height/2) - (BackgroundViewSize.height/2), width: BackgroundViewSize.width, height: BackgroundViewSize.height))
+
+            BackgroundItem.isUserInteractionEnabled = true
+            BackgroundItem.tag = Data
+            BackgroundItem.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(self.PrepareSelectItem(_:))))
             
-            ImageView.tag = Data
-        
-            let Label = UILabel(frame: CGRect(x: 0 , y: 0, width: ImageView.frame.size.width, height: ImageView.frame.size.height))
+            let Label = UILabel(frame: CGRect(x: 0 , y: 0, width: BackgroundItem.frame.size.width, height: BackgroundItem.frame.size.height))
             Label.textAlignment = .center
             Label.text = "\(Data)"
             Label.numberOfLines = 0
             Label.font = UIFont.systemFont(ofSize: ScreenSize.SCREEN_HEIGHT_AutoLayout * 30)
-            ImageView.addSubview(Label)
+            BackgroundItem.addSubview(Label)
             
-            MyScrollView.addSubview(ImageView)
-    
-            CounterImage += 1
+            MyScrollView.addSubview(BackgroundItem)
+            
+            CounterView += 1
         }
-        MyScrollView.contentSize = CGSize(width: (((ScreenSize.SCREEN_WIDTH/ItemPerPage)-SpacePerItem) * (CounterImage+1)) + (SpacePerItem*(CounterImage+1)), height: 200)
-        
+        MyScrollView.contentSize = CGSize(width: (((MyScrollViewSize.width/ItemPerPage)-SpacePerItem) * (CounterView+1)) + (SpacePerItem*(CounterView+1)), height: MyScrollViewSize.height - 10)
+        SetCurrentIndexItem = CurrentIndex
     }
     
     override func viewDidAppear(_ animated: Bool) {
@@ -84,11 +85,22 @@ extension ViewController : UIScrollViewDelegate {
             return
         }
         
-        CurrentIndex = CGFloat(Int(scrollView.contentOffset.x / ((scrollView.frame.size.width/ItemPerPage)-(SpacePerItem/3))))
+        CurrentIndex = CGFloat(Int(scrollView.contentOffset.x / ((scrollView.frame.size.width/ItemPerPage)-((SpacePerItem/3)-(TotalItem/10)))))
         if CurrentIndex >= TotalItem { CurrentIndex -= 1 }
-   
+        
+        SetupSelectedItem(scrollView : scrollView)
+    }
+    
+    func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
+        Timer.scheduledTimer(timeInterval: 0.5, target: self, selector: #selector(self.SelectedItem) , userInfo: nil, repeats: false)
+    }
+    
+    func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
+        SelectedItem()
+    }
+    
+    internal func SetupSelectedItem(scrollView: UIScrollView) {
         for UI in scrollView.subviews {
-           //if CurrentIndex >= TotalItem { CurrentIndex -= 1 }
             if Int(CurrentIndex+1) == UI.tag {
                 UI.backgroundColor = UIColor.red
                 UI.transform = CGAffineTransform(translationX: -(AddBackgroundSizeWhenSelected.width/2), y: -(AddBackgroundSizeWhenSelected.height/2))
@@ -113,11 +125,9 @@ extension ViewController : UIScrollViewDelegate {
         }
     }
     
-    func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
-        Timer.scheduledTimer(timeInterval: 0.5, target: self, selector: #selector(self.SelectedItem) , userInfo: nil, repeats: false)
-    }
-    
-    func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
+    @objc private func PrepareSelectItem(_ sender : UIGestureRecognizer) {
+        guard let index = sender.view?.tag else { return }
+        SetCurrentIndexItem = CGFloat(index-1)
         SelectedItem()
     }
     
@@ -125,6 +135,6 @@ extension ViewController : UIScrollViewDelegate {
         print("Current Index \(CurrentIndex)")
         Scrolling = false
         if CurrentIndex >= TotalItem { CurrentIndex -= 1 }
-        MyScrollView.setContentOffset(CGPoint(x: ((MyScrollView.frame.size.width/ItemPerPage) * CurrentIndex), y: 0), animated: true)
+        SetCurrentIndexItem = CurrentIndex
     }
 }
